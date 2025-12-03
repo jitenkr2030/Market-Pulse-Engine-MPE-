@@ -1,6 +1,6 @@
 # Market Pulse Engine (MPE) - Workspace Organization
 
-**Author**: MiniMax Agent  
+**Author**: Jitender Kumar  
 **Date**: 2025-12-03  
 **Status**: ✅ **SYSTEM FULLY OPERATIONAL - 24/24 ENGINES**
 
@@ -245,4 +245,4 @@ main()
 
 **Status**: ✅ **INSTITUTIONAL-GRADE READY**  
 **Generated**: 2025-12-03 13:10:48  
-**Author**: MiniMax Agent
+**Author**: Jitender Kumar
