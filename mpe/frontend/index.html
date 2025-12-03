@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Pulse Engine (MPE) - Real-Time Market Intelligence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 1rem;
+            padding: 1rem;
+            height: calc(100vh - 80px);
+        }
+        
+        .sidebar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .right-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .mpi-display {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .mpi-score {
+            font-size: 4rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .mpi-score.high { color: #00ff88; }
+        .mpi-score.medium { color: #ffa726; }
+        .mpi-score.low { color: #ff5252; }
+        
+        .mpi-label {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .regime-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 500;
+            color: white;
+        }
+        
+        .regime-risk-on { background: linear-gradient(45deg, #00ff88, #00cc6a); }
+        .regime-risk-off { background: linear-gradient(45deg, #ff5252, #d32f2f); }
+        .regime-neutral { background: linear-gradient(45deg, #ffa726, #f57c00); }
+        .regime-crisis { background: linear-gradient(45deg, #ff1744, #c62828); }
+        .regime-euphoria { background: linear-gradient(45deg, #9c27b0, #7b1fa2); }
+        
+        .gauge-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 1rem auto;
+        }
+        
+        .gauge {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                #00ff88 0deg,
+                #00ff88 calc(var(--percentage) * 3.6deg),
+                #e0e0e0 calc(var(--percentage) * 3.6deg),
+                #e0e0e0 360deg
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .gauge::before {
+            content: '';
+            position: absolute;
+            width: 70%;
+            height: 70%;
+            background: white;
+            border-radius: 50%;
+        }
+        
+        .gauge-value {
+            position: relative;
+            z-index: 1;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .pulse-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .pulse-item {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .pulse-item.active {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        .pulse-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .pulse-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .sentiment-meter {
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(90deg, 
+                #ff1744 0%, 
+                #ff5722 25%, 
+                #ffc107 50%, 
+                #8bc34a 75%, 
+                #00e676 100%);
+            border-radius: 20px;
+            position: relative;
+            margin: 1rem 0;
+        }
+        
+        .sentiment-indicator {
+            position: absolute;
+            top: -5px;
+            width: 50px;
+            height: 50px;
+            background: white;
+            border: 3px solid #007bff;
+            border-radius: 50%;
+            transform: translateX(-50%);
+            transition: left 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        
+        .alert-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .alert-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            border-left: 4px solid;
+            background: #f8f9fa;
+        }
+        
+        .alert-item.high { border-left-color: #ff1744; background: #ffebee; }
+        .alert-item.medium { border-left-color: #ff9800; background: #fff3e0; }
+        .alert-item.low { border-left-color: #4caf50; background: #e8f5e8; }
+        
+        .alert-time {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        
+        .engine-status {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .engine-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+        
+        .engine-name {
+            font-weight: 500;
+        }
+        
+        .engine-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .engine-indicator.active { background: #00ff88; }
+        .engine-indicator.inactive { background: #ff5252; }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: white;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>📊 Market Pulse Engine (MPE)</h1>
+        <div class="status">
+            <div class="status-indicator"></div>
+            <span>Live Market Intelligence</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Left Sidebar - Controls & Assets -->
+        <aside class="sidebar">
+            <div class="card">
+                <h3>🎛️ Controls</h3>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="connectWebSocket()">Connect</button>
+                    <button class="btn btn-success" onclick="refreshData()">Refresh</button>
+                </div>
+                
+                <h4 style="margin: 1rem 0 0.5rem 0;">Monitored Assets</h4>
+                <div id="asset-list">
+                    <div class="pulse-item">
+                        <div class="pulse-value">SPY</div>
+                        <div class="pulse-label">S&P 500 ETF</div>
+                    </div>
+                    <div class="pulse-item">
+                        <div class="pulse-value">QQQ</div>
+                        <div class="pulse-label">NASDAQ ETF</div>
+                    </div>
+                    <div class="pulse-item">
+                        <div class="pulse-value">IWM</div>
+                        <div class="pulse-label">Russell 2000</div>
+                    </div>
+                    <div class="pulse-item">
+                        <div class="pulse-value">TLT</div>
+                        <div class="pulse-label">20+ Year Bonds</div>
+                    </div>
+                    <div class="pulse-item">
+                        <div class="pulse-value">GLD</div>
+                        <div class="pulse-label">Gold ETF</div>
+                    </div>
+                    <div class="pulse-item">
+                        <div class="pulse-value">BTC</div>
+                        <div class="pulse-label">Bitcoin</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Market Pulse Index -->
+            <div class="card">
+                <h3>🎯 Market Pulse Index (MPI)</h3>
+                <div class="mpi-display">
+                    <div class="mpi-score medium" id="mpi-score">0.65</div>
+                    <div class="mpi-label" id="mpi-label">Positive Market Conditions</div>
+                    <div class="regime-badge regime-neutral" id="regime-badge">NEUTRAL REGIME</div>
+                </div>
+                
+                <div class="gauge-container">
+                    <div class="gauge" id="mpi-gauge" style="--percentage: 65">
+                        <div class="gauge-value">65</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pulse Engines -->
+            <div class="card">
+                <h3>⚡ Pulse Engines</h3>
+                <div class="pulse-grid">
+                    <div class="pulse-item active" id="sentiment-pulse">
+                        <div class="pulse-value" id="sentiment-value">0.2</div>
+                        <div class="pulse-label">Sentiment</div>
+                    </div>
+                    <div class="pulse-item active" id="volatility-pulse">
+                        <div class="pulse-value" id="volatility-value">0.3</div>
+                        <div class="pulse-label">Volatility</div>
+                    </div>
+                    <div class="pulse-item active" id="liquidity-pulse">
+                        <div class="pulse-value" id="liquidity-value">0.6</div>
+                        <div class="pulse-label">Liquidity</div>
+                    </div>
+                    <div class="pulse-item active" id="correlation-pulse">
+                        <div class="pulse-value" id="correlation-value">0.4</div>
+                        <div class="pulse-label">Correlation</div>
+                    </div>
+                    <div class="pulse-item active" id="flow-pulse">
+                        <div class="pulse-value" id="flow-value">0.1</div>
+                        <div class="pulse-label">Flow</div>
+                    </div>
+                    <div class="pulse-item active" id="risk-pulse">
+                        <div class="pulse-value" id="risk-value">0.4</div>
+                        <div class="pulse-label">Risk</div>
+                    </div>
+                    <div class="pulse-item active" id="momentum-pulse">
+                        <div class="pulse-value" id="momentum-value">0.2</div>
+                        <div class="pulse-label">Momentum</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Sentiment -->
+            <div class="card">
+                <h3>📈 Market Sentiment</h3>
+                <div class="sentiment-meter">
+                    <div class="sentiment-indicator" id="sentiment-indicator" style="left: 50%;">😐</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #666;">
+                    <span>😰 Extreme Fear</span>
+                    <span>😐 Neutral</span>
+                    <span>🚀 Extreme Greed</span>
+                </div>
+                <div style="text-align: center; margin-top: 1rem;">
+                    <strong>Fear & Greed Index:</strong> <span id="fear-greed-index">45</span>/100
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel - Alerts & Engine Status -->
+        <aside class="right-panel">
+            <!-- System Alerts -->
+            <div class="card">
+                <h3>🚨 System Alerts</h3>
+                <div class="alert-list" id="alert-list">
+                    <div class="alert-item medium">
+                        <div><strong>Volatility Spike</strong></div>
+                        <div>High volatility detected in SPY</div>
+                        <div class="alert-time">2 minutes ago</div>
+                    </div>
+                    <div class="alert-item low">
+                        <div><strong>Flow Update</strong></div>
+                        <div>Institutional flow positive</div>
+                        <div class="alert-time">5 minutes ago</div>
+                    </div>
+                    <div class="alert-item low">
+                        <div><strong>Market Open</strong></div>
+                        <div>All systems operational</div>
+                        <div class="alert-time">1 hour ago</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Engine Status -->
+            <div class="card">
+                <h3>⚙️ Engine Status</h3>
+                <div class="engine-status" id="engine-status">
+                    <div class="engine-item">
+                        <span class="engine-name">Sentiment Pulse</span>
+                        <div class="engine-indicator active"></div>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-name">Volatility Pulse</span>
+                        <div class="engine-indicator active"></div>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-name">Liquidity Pulse</span>
+                        <div class="engine-indicator active"></div>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-name">Correlation Pulse</span>
+                        <div class="engine-indicator active"></div>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-name">Flow Pulse</span>
+                        <div class="engine-indicator active"></div>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-name">Risk Pulse</span>
+                        <div class="engine-indicator active"></div>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-name">Momentum Pulse</span>
+                        <div class="engine-indicator active"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Summary -->
+            <div class="card">
+                <h3>📊 Market Summary</h3>
+                <div id="market-summary">
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Overall Regime:</strong> <span id="overall-regime">Neutral</span>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Confidence Level:</strong> <span id="confidence-level">82%</span>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Last Update:</strong> <span id="last-update">Just now</span>
+                    </div>
+                    <div>
+                        <strong>Active Engines:</strong> <span id="active-engines">30/30</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <span>Loading Market Pulse Engine...</span>
+    </div>
+
+    <script>
+        // Global variables
+        let ws = null;
+        let isConnected = false;
+        let updateInterval = null;
+
+        // WebSocket connection
+        function connectWebSocket() {
+            if (isConnected) {
+                console.log('Already connected');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                // Connect to the MPE WebSocket endpoint
+                ws = new WebSocket('ws://localhost:8000/ws/user_' + Date.now());
+                
+                ws.onopen = function(event) {
+                    console.log('Connected to MPE WebSocket');
+                    isConnected = true;
+                    showLoading(false);
+                    
+                    // Subscribe to market pulse updates
+                    sendWebSocketMessage({
+                        action: 'subscribe',
+                        assets: ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD', 'BTCUSD'],
+                        pulses: ['sentiment', 'volatility', 'liquidity', 'correlation', 'flow', 'risk', 'momentum']
+                    });
+                    
+                    // Start periodic data refresh
+                    updateInterval = setInterval(refreshData, 5000);
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    console.log('Received data:', data);
+                    handleWebSocketMessage(data);
+                };
+                
+                ws.onclose = function(event) {
+                    console.log('WebSocket connection closed');
+                    isConnected = false;
+                    if (updateInterval) {
+                        clearInterval(updateInterval);
+                        updateInterval = null;
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    showLoading(false);
+                };
+                
+            } catch (error) {
+                console.error('Failed to connect:', error);
+                showLoading(false);
+            }
+        }
+
+        function sendWebSocketMessage(message) {
+            if (ws && isConnected) {
+                ws.send(JSON.stringify(message));
+            }
+        }
+
+        function handleWebSocketMessage(data) {
+            switch(data.action) {
+                case 'market_pulse_update':
+                    updateMarketPulse(data.data);
+                    break;
+                case 'real_time_update':
+                    updateRealTimeData(data.data);
+                    break;
+                case 'subscription_confirmed':
+                    console.log('Subscription confirmed:', data);
+                    break;
+                case 'error':
+                    console.error('WebSocket error:', data.message);
+                    break;
+                default:
+                    console.log('Unknown message type:', data);
+            }
+        }
+
+        // Update functions
+        function updateMarketPulse(pulseData) {
+            if (!pulseData) return;
+            
+            // Update MPI score
+            if (pulseData.market_pulse_index) {
+                const mpi = pulseData.market_pulse_index;
+                updateMPIDisplay(mpi.mpi_score, mpi.regime, mpi.interpretation);
+            }
+            
+            // Update component scores
+            if (pulseData.component_analysis) {
+                updateComponentScores(pulseData.component_analysis);
+            }
+            
+            // Update sentiment
+            if (pulseData.market_pulse_index && pulseData.market_pulse_index.sentiment_state) {
+                updateSentimentDisplay(pulseData.market_pulse_index.sentiment_state);
+            }
+            
+            // Update alerts
+            if (pulseData.alerts) {
+                updateAlerts(pulseData.alerts);
+            }
+            
+            // Update system info
+            if (pulseData.system_info) {
+                updateSystemInfo(pulseData.system_info);
+            }
+        }
+
+        function updateMPIDisplay(score, regime, interpretation) {
+            const mpiScore = Math.round(score * 100);
+            const mpiScoreElement = document.getElementById('mpi-score');
+            const mpiLabel = document.getElementById('mpi-label');
+            const regimeBadge = document.getElementById('regime-badge');
+            const mpiGauge = document.getElementById('mpi-gauge');
+            
+            // Update MPI score
+            mpiScoreElement.textContent = mpiScore;
+            mpiScoreElement.className = 'mpi-score ' + getMPIColorClass(score);
+            
+            // Update label
+            mpiLabel.textContent = interpretation;
+            
+            // Update regime badge
+            regimeBadge.className = 'regime-badge regime-' + regime.toLowerCase().replace('_', '-');
+            regimeBadge.textContent = regime.toUpperCase().replace('_', ' ') + ' REGIME';
+            
+            // Update gauge
+            mpiGauge.style.setProperty('--percentage', mpiScore);
+            mpiGauge.querySelector('.gauge-value').textContent = mpiScore;
+        }
+
+        function updateComponentScores(componentData) {
+            // Update individual pulse values
+            const components = {
+                'sentiment_score': 'sentiment-value',
+                'volatility_level': 'volatility-value',
+                'liquidity_level': 'liquidity-value',
+                'correlation_score': 'correlation-value',
+                'momentum': 'momentum-value',
+                'risk_level': 'risk-value'
+            };
+            
+            Object.entries(components).forEach(([component, elementId]) => {
+                if (componentData[component] !== undefined) {
+                    const value = Math.round(Math.abs(componentData[component]) * 100);
+                    document.getElementById(elementId).textContent = value;
+                }
+            });
+        }
+
+        function updateSentimentDisplay(sentimentState) {
+            const sentimentMap = {
+                'extreme_fear': { position: 10, emoji: '😰', index: 10 },
+                'fear': { position: 30, emoji: '😟', index: 30 },
+                'neutral': { position: 50, emoji: '😐', index: 50 },
+                'greed': { position: 70, emoji: '😊', index: 70 },
+                'extreme_greed': { position: 90, emoji: '🚀', index: 90 }
+            };
+            
+            const sentiment = sentimentMap[sentimentState] || sentimentMap['neutral'];
+            
+            document.getElementById('sentiment-indicator').style.left = sentiment.position + '%';
+            document.getElementById('sentiment-indicator').textContent = sentiment.emoji;
+            document.getElementById('fear-greed-index').textContent = sentiment.index;
+        }
+
+        function updateAlerts(alerts) {
+            const alertList = document.getElementById('alert-list');
+            alertList.innerHTML = '';
+            
+            alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert-item ${alert.severity}`;
+                alertDiv.innerHTML = `
+                    <div><strong>${alert.type.replace('_', ' ').toUpperCase()}</strong></div>
+                    <div>${alert.message}</div>
+                    <div class="alert-time">${formatTime(alert.timestamp)}</div>
+                `;
+                alertList.appendChild(alertDiv);
+            });
+            
+            // Add some default alerts if none provided
+            if (alerts.length === 0) {
+                alertList.innerHTML = `
+                    <div class="alert-item low">
+                        <div><strong>System Status</strong></div>
+                        <div>All engines operational</div>
+                        <div class="alert-time">Just now</div>
+                    </div>
+                `;
+            }
+        }
+
+        function updateSystemInfo(systemInfo) {
+            if (systemInfo.last_update) {
+                document.getElementById('last-update').textContent = formatTime(systemInfo.last_update);
+            }
+            if (systemInfo.engines_contributing) {
+                document.getElementById('active-engines').textContent = `30/30`;
+            }
+        }
+
+        function updateRealTimeData(data) {
+            // Update real-time data like prices, volume, etc.
+            console.log('Real-time update:', data);
+        }
+
+        function refreshData() {
+            if (isConnected) {
+                sendWebSocketMessage({
+                    action: 'get_market_pulse',
+                    assets: ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD', 'BTCUSD']
+                });
+            } else {
+                // Generate mock data for demonstration
+                generateMockData();
+            }
+        }
+
+        function generateMockData() {
+            // Generate realistic mock data for demonstration
+            const mpiScore = 0.3 + Math.random() * 0.4; // 0.3 to 0.7
+            const sentiment = Math.random() * 2 - 1; // -1 to 1
+            const regimes = ['risk_on', 'risk_off', 'neutral'];
+            const regime = regimes[Math.floor(Math.random() * regimes.length)];
+            
+            updateMPIDisplay(mpiScore, regime, 'Mock market conditions');
+            updateSentimentDisplay(getSentimentState(sentiment));
+            
+            // Update component scores
+            document.getElementById('sentiment-value').textContent = Math.round(Math.abs(sentiment) * 100);
+            document.getElementById('volatility-value').textContent = Math.round(Math.random() * 100);
+            document.getElementById('liquidity-value').textContent = Math.round(30 + Math.random() * 40);
+            document.getElementById('correlation-value').text.round(Math.random() * 100);
+            document.getElementById('flow-value').textContent = Math.round(Math.random() * 100);
+            document.getElementById('risk-value').textContent = Math.round(Math.random() * 100);
+            document.getElementById('momentum-value').textContent = Math.round(Math.random() * 100);
+            
+            // Update confidence
+            document.getElementById('confidence-level').textContent = Math.round(75 + Math.random() * 20) + '%';
+        }
+
+        function getMPIColorClass(score) {
+            if (score >= 0.7) return 'high';
+            if (score >= 0.3) return 'medium';
+            return 'low';
+        }
+
+        function getSentimentState(sentiment) {
+            if (sentiment <= -0.6) return 'extreme_fear';
+            if (sentiment <= -0.3) return 'fear';
+            if (sentiment >= 0.6) return 'extreme_greed';
+            if (sentiment >= 0.3) return 'greed';
+            return 'neutral';
+        }
+
+        function formatTime(timestamp) {
+            const now = new Date();
+            const time = new Date(timestamp);
+            const diff = Math.floor((now - time) / 1000);
+            
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+            return Math.floor(diff / 86400) + ' days ago';
+        }
+
+        function showLoading(show) {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Market Pulse Engine Dashboard Loaded');
+            
+            // Auto-connect after a short delay
+            setTimeout(() => {
+                connectWebSocket();
+                refreshData();
+            }, 1000);
+        });
+
+        // Handle window beforeunload
+        window.addEventListener('beforeunload', function() {
+            if (ws) {
+                ws.close();
+            }
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    </script>
+</body>
+</html>
